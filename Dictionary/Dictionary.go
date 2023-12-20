@@ -1,6 +1,5 @@
-package Dictionary
-
 // dictionary.go
+package dictionary
 
 import (
 	"bufio"
@@ -9,97 +8,84 @@ import (
 )
 
 type Dictionary struct {
-	filePath string
+	filePath   string
+	addChan    chan entry
+	removeChan chan string
+}
+
+type entry struct {
+	word       string
+	definition string
 }
 
 func NewDictionary(filePath string) *Dictionary {
-	return &Dictionary{filePath: filePath}
+	dict := &Dictionary{
+		filePath:   filePath,
+		addChan:    make(chan entry),
+		removeChan: make(chan string),
+	}
+
+	go dict.handleAdditions()
+	go dict.handleRemovals()
+
+	return dict
 }
 
-func (d *Dictionary) Add(word, definition string) error {
+func (d *Dictionary) handleAdditions() {
 	file, err := os.OpenFile(d.filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(word + ":" + definition + "\n")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *Dictionary) Get(word string) (string, error) {
-	file, err := os.Open(d.filePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		parts := strings.Split(scanner.Text(), ":")
-		if len(parts) == 2 && parts[0] == word {
-			return parts[1], nil
-		}
-	}
-
-	return "", nil // Word not found
-}
-
-func (d *Dictionary) Remove(word string) error {
-	lines := []string{}
-
-	file, err := os.Open(d.filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		parts := strings.Split(scanner.Text(), ":")
-		if len(parts) != 2 || parts[0] != word {
-			lines = append(lines, scanner.Text())
-		}
-	}
-
-	newFile, err := os.Create(d.filePath)
-	if err != nil {
-		return err
-	}
-	defer newFile.Close()
-
-	writer := bufio.NewWriter(newFile)
-	for _, line := range lines {
-		_, err := writer.WriteString(line + "\n")
+	for {
+		entry := <-d.addChan
+		_, err := file.WriteString(entry.word + ":" + entry.definition + "\n")
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
-	writer.Flush()
-
-	return nil
 }
 
-func (d *Dictionary) List() (map[string]string, error) {
-	entries := make(map[string]string)
+func (d *Dictionary) handleRemovals() {
+	for {
+		word := <-d.removeChan
+		lines := []string{}
 
-	file, err := os.Open(d.filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		parts := strings.Split(scanner.Text(), ":")
-		if len(parts) == 2 {
-			entries[parts[0]] = parts[1]
+		file, err := os.Open(d.filePath)
+		if err != nil {
+			panic(err)
 		}
-	}
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			parts := strings.Split(scanner.Text(), ":")
+			if len(parts) != 2 || parts[0] != word {
+				lines = append(lines, scanner.Text())
+			}
+		}
+		file.Close()
 
-	return entries, nil
+		newFile, err := os.Create(d.filePath)
+		if err != nil {
+			panic(err)
+		}
+
+		writer := bufio.NewWriter(newFile)
+		for _, line := range lines {
+			_, err := writer.WriteString(line + "\n")
+			if err != nil {
+				panic(err)
+			}
+		}
+		writer.Flush()
+		newFile.Close()
+	}
+}
+
+func (d *Dictionary) Add(word, definition string) {
+	d.addChan <- entry{word: word, definition: definition}
+}
+
+func (d *Dictionary) Remove(word string) {
+	d.removeChan <- word
 }
