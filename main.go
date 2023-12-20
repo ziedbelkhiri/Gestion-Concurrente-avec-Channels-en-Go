@@ -2,23 +2,28 @@ package main
 
 import (
 	"fmt"
-
-	"./Dictionary"
+	"myproject/Dictionary"
 )
 
 func main() {
-	myDictionary := Dictionary.Dictionary{}
 
-	myDictionary.Add("word1", "definition1")
-	myDictionary.Add("word2", "definition2")
+	filePath := "C:/Users/MHD/OneDrive/Desktop/goo/Dictionnaires.txt"
 
-	definition := myDictionary.Get("word1")
-	fmt.Println("Definition:", definition)
+	myDictionary := Dictionary.NewDictionary(filePath)
 
-	myDictionary.Remove("word2")
+	// Ajouter des mots et des définitions
+	myDictionary.Add("apple", "a fruit")
+	myDictionary.Add("golang", "a programming language")
+	myDictionary.Add("car", "a vehicle")
 
-	wordList := myDictionary.List()
-	for word, definition := range wordList {
-		fmt.Printf("%s: %s\n", word, definition)
-	}
+	// Obtenir une définition
+	definition, _ := myDictionary.Get("apple")
+	fmt.Println("Definition of 'apple':", definition)
+
+	// Supprimer un mot
+	myDictionary.Remove("car")
+
+	// Liste de tous les mots
+	words, _ := myDictionary.List()
+	fmt.Println("All words in the dictionary:", words)
 }
